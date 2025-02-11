@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
+    <style>
+        html,
+        body {
+            padding: 0;
+            margin: 0;
+        }
+
+        /* Placeholders */
+        .page {
+            height: 30vh;
+            /*height: 0vh;*/
+        }
+
+        .globe-container {
+            height: 100vh;
+            position: relative;
+            overflow: hidden;
+            background-color: #D7E5FC;
+        }
+
+        .globe-wrapper {
+            position: absolute;
+        }
+
+        #globe-popups-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .overlay-img-container {
+            position: absolute;
+            width: 75px;
+            height: 75px;
+            display: flex;
+            transform: translate(-50%, -50%);
+        }
+
+        .overlay-img-container img {
+            border-radius: 8px;
+            border: 2px solid white;
+            transform-origin: center center;
+        }
+
+        .lil-gui {
+            --width: 400px;
+            --widget-height: 20px;
+            font-size: 15px;
+            --input-font-size: 15px;
+            --padding: 10px;
+            --spacing: 10px;
+            --slider-knob-width: 5px;
+            --background-color: rgba(5, 0, 15, .8);
+            --widget-color: rgba(255, 255, 255, .3);
+            --focus-color: rgba(255, 255, 255, .4);
+            --hover-color: rgba(255, 255, 255, .5);
+            --font-family: monospace;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+
+<div class="page">
+</div>
+<div class="globe-container">
+    <div class="globe-wrapper">
+        <canvas id="globe-3d"></canvas>
+        <div id="globe-popups-overlay">
+        </div>
+    </div>
+</div>
+<div class="page">
+</div>
+
+<script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.167.1/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.167.1/examples/jsm/"
+    }
+  }
+</script>
+
+
+<script type="module">
+
+    import * as THREE from 'three';
+    import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+    import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+    // import {GUI} from 'three/addons/libs/lil-gui.module.min.js';
+
+    const containerEl = document.querySelector(".globe-container");
+    const wrapperEl = document.querySelector(".globe-wrapper");
+    const canvas3D = containerEl.querySelector("#globe-3d");
+    const popupsContainer = containerEl.querySelector("#globe-popups-overlay");
+
+    let renderer, group, scene, camera, orbit, lightHolder, sea, wrapper;
+
+    const getSizes = () => {
+        return {
+            offsetLeftPercent: .4,
+            offsetBottomPx: .3 * window.innerHeight,
+            extraHeightPX: .2 * window.innerHeight,
+            sizePx: window.innerHeight,
+        }
+    }
+
+    const params = {
+        sizes: getSizes()
+    }
+
+    const locations = [{
+        name: 'NY',
+        location: coordToPos(40, -74),
+        picURL: "https://api.dicebear.com/9.x/thumbs/svg?seed=Brian"
+    }, {
+        name: 'london',
+        location: coordToPos(51, 0),
+        picURL: "https://api.dicebear.com/9.x/thumbs/svg?seed=Mackenzie"
+    }, {
+        name: 'UAE',
+        location: coordToPos(23, 54),
+        picURL: "https://api.dicebear.com/9.x/thumbs/svg?seed=Sophia"
+    }, {
+        name: 'india',
+        location: coordToPos(29, 77),
+        picURL: "https://api.dicebear.com/9.x/thumbs/svg?seed=Sarah"
+    }];
+
+    initScene();
+    cretePointers();
+    render();
+    // createControls();
+    window.addEventListener("resize", updateSceneSize);
+
+    function initScene() {
+        renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            canvas: canvas3D,
+            alpha: true
+        });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        // renderer.toneMappingExposure = 2;
+
+        scene = new THREE.Scene();
+
+        camera = new THREE.PerspectiveCamera(45, 1, .01, 100);
+        camera.position.set(0, 0, 3);
+
+        wrapper = new THREE.Group();
+        scene.add(wrapper);
+
+        updateSceneSize();
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 2);
+        scene.add(ambientLight);
+
+        const sideLight = new THREE.SpotLight(0xffffff, 2);
+        sideLight.position.set(1, -1, 2);
+        // sideLight.castShadow = true;
+        const topLight = new THREE.SpotLight(0xffffff, 6);
+        topLight.position.set(-1.3, 1.1, 2.3);
+        topLight.castShadow = true;
+        topLight.shadow.mapSize.width = 4056;
+        topLight.shadow.mapSize.height = 4056;
+        topLight.shadow.camera.near = 1;
+        topLight.shadow.camera.far = 3;
+        topLight.shadow.camera.left = -1;
+        topLight.shadow.camera.right = 1;
+        topLight.shadow.camera.top = 1;
+        topLight.shadow.camera.bottom = -1;
+        topLight.shadow.bias = -.0001;
+        topLight.shadow.radius = 5;
+        // topLight.shadow.normalBias = 0.01;
+        topLight.castShadow = true;
+
+
+        lightHolder = new THREE.Group();
+        lightHolder.add(sideLight);
+        lightHolder.add(topLight);
+        wrapper.add(lightHolder);
+
+        orbit = new OrbitControls(camera, canvas3D);
+        orbit.enableZoom = false;
+        orbit.enablePan = false;
+        orbit.enableDamping = true;
+        orbit.minPolarAngle = .37 * Math.PI;
+        orbit.maxPolarAngle = .37 * Math.PI;
+        orbit.autoRotate = true;
+        orbit.autoRotateSpeed *= .5;
+
+
+        const gltfLoader = new GLTFLoader();
+        gltfLoader.load(
+            'no-materials.glb',
+            (gltf) => {
+                const terra = gltf.scene.children[1];
+                terra.castShadow = true;
+                wrapper.add(terra);
+
+                terra.material = new THREE.MeshPhysicalMaterial({
+                    metalness: .0,
+                    roughness: .34,
+                    ior: .78,
+                    specular: 0.9,
+                    // metalness: .8,
+                    // roughness: .7,
+                    // emissive: 0x448600,
+                    reflectivity: .5,
+                    // ior: 2,
+                    // clearcoat: .3,
+                    // clearcoatRoughness: .7,
+                    onBeforeCompile: (shader) => {
+
+                        shader.vertexShader = shader.vertexShader.replace(
+                            '#include <common>',
+                            `#include <common>\n varying vec3 vPosition;`
+                        );
+
+                        shader.vertexShader = shader.vertexShader.replace(
+                            '#include <beginnormal_vertex>',
+                            `#include <beginnormal_vertex>\n vPosition = (modelMatrix * vec4(position, 1.0)).xyz;`
+                        );
+
+                        shader.fragmentShader = shader.fragmentShader.replace(
+                            '#include <common>',
+                            `#include <common>\n varying vec3 vPosition;`
+                        );
+
+                        // shader.fragmentShader = shader.fragmentShader.replace(
+                        //     'vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;',
+                        //     'vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;'
+                        // );
+
+                        shader.fragmentShader = shader.fragmentShader.replace(
+                            'vec4 diffuseColor = vec4( diffuse, opacity );',
+                            `
+                                vec3 color = vec3(.2, 1., .1);
+                                vec3 color2 = vec3(.6, 1.2, .0);
+
+                                color = mix(color, color2, 1.2 * vPosition.y);
+
+                                // float dynamicRoughness = smoothstep(2.0, 5.0, length(vPosition));
+                                // roughness = mix(0.2, 1.0, dynamicRoughness);
+
+                                vec4 diffuseColor = vec4(.7 * color, opacity);
+                            `
+                        );
+
+                    }
+                });
+
+                const sea = gltf.scene.children[0];
+                sea.receiveShadow = true;
+                wrapper.add(sea);
+
+                sea.material = new THREE.MeshPhysicalMaterial({
+                    metalness: .2,
+                    roughness: 0.6,
+                    reflectivity: .7,
+                    // color: 0x10B0FE,
+                    onBeforeCompile: (shader) => {
+
+                        shader.vertexShader = shader.vertexShader.replace(
+                            '#include <common>',
+                            `#include <common>\n varying vec3 vPosition;`
+                        );
+
+                        shader.vertexShader = shader.vertexShader.replace(
+                            '#include <beginnormal_vertex>',
+                            `#include <beginnormal_vertex>\n vPosition = (modelMatrix * vec4(position, 1.0)).xyz;`
+                        );
+
+                        shader.fragmentShader = shader.fragmentShader.replace(
+                            '#include <common>',
+                            `#include <common>\n varying vec3 vPosition;`
+                        );
+
+                        shader.fragmentShader = shader.fragmentShader.replace(
+                            'vec4 diffuseColor = vec4( diffuse, opacity );',
+                            `
+                                vec3 color = vec3(.063, .69, .996);
+                                vec3 color2 = vec3(.0, .5, 1.);
+
+                                color = mix(color, color2, vNormal.z);
+
+                                vec4 diffuseColor = vec4(color, opacity);
+                            `
+                        );
+
+                    }
+
+                })
+
+            });
+    }
+
+    function cretePointers() {
+        const pointerGeometry = new THREE.IcosahedronGeometry(.1, 3);
+        const pointerMaterial = new THREE.MeshBasicMaterial({
+            visible: false
+        });
+
+        for (let lIdx = 0; lIdx < locations.length; lIdx++) {
+
+            const pointer = new THREE.Mesh(pointerGeometry, pointerMaterial);
+            pointer.position.set(locations[lIdx].location.x, locations[lIdx].location.y, locations[lIdx].location.z);
+            pointer.name = lIdx;
+            wrapper.add(pointer);
+            locations[lIdx].mesh = pointer;
+
+
+            locations[lIdx].popup = document.createElement("div");
+            locations[lIdx].popup.classList.add("overlay-img-container");
+            const img = document.createElement("img");
+            locations[lIdx].popupImg = img;
+            img.src = locations[lIdx].picURL;
+            locations[lIdx].popup.appendChild(img);
+            popupsContainer.appendChild(locations[lIdx].popup);
+        }
+
+
+    }
+
+    function render(time) {
+
+        orbit.update();
+        lightHolder.quaternion.copy(camera.quaternion);
+
+        locations.forEach((l, lIdx) => {
+            let activePointPosition = l.mesh.position.clone();
+            const activePointPositionProjected = activePointPosition.clone();
+            activePointPositionProjected.project(camera);
+
+            const matrixWorldInverse = orbit.object.matrixWorldInverse;
+            activePointPosition.applyMatrix4(matrixWorldInverse);
+
+            const x = (activePointPositionProjected.x + 1) * popupsContainer.offsetWidth * .5;
+            const y = (1 - activePointPositionProjected.y) * popupsContainer.offsetHeight * .5;
+
+            locations[lIdx].popup.style.left = x + "px";
+            locations[lIdx].popup.style.top = y + "px";
+
+            locations[lIdx].popup.style.opacity = THREE.MathUtils.clamp(30 * (activePointPosition.z + 2.5), 0, 1);
+            // locations[lIdx].popupImg.style.transform = "scale(" + THREE.MathUtils.clamp(20 * (activePointPosition.z + 2.7), .7, 1) + ")";
+        });
+
+
+        renderer.render(scene, camera);
+        requestAnimationFrame(render);
+    }
+
+    function updateSceneSize() {
+        params.sizes = getSizes();
+
+        renderer.setSize(params.sizes.sizePx + params.sizes.extraHeightPX, params.sizes.sizePx + params.sizes.extraHeightPX);
+
+        wrapperEl.style.left = params.sizes.offsetLeftPercent * window.innerWidth + "px";
+        wrapperEl.style.bottom = -params.sizes.offsetBottomPx + "px";
+    }
+
+    function createControls() {
+        const gui = new GUI();
+        // gui
+        //     .add(params, "test", 0, 1000)
+    }
+
+
+    function coordToPos(lat, lon) {
+        const phi = (90 - lat) * (Math.PI / 180);
+        const theta = (lon + 90) * (Math.PI / 180);
+        return new THREE.Vector3(
+            -Math.sin(phi) * Math.cos(theta),
+            Math.cos(phi),
+            Math.sin(phi) * Math.sin(theta)
+        );
+    }
+
+</script>
+
+</body>
+</html>
