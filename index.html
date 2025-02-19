@@ -9,23 +9,27 @@
         body {
             padding: 0;
             margin: 0;
-        }
 
-        /* Placeholders */
-        .page {
-            height: 30vh;
-            /*height: 0vh;*/
+            background-color: #D7E5FC;
         }
 
         .globe-container {
             height: 100vh;
             position: relative;
             overflow: hidden;
-            background-color: #D7E5FC;
         }
 
         .globe-wrapper {
             position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-20%, -30%);
+        }
+
+        @media (max-aspect-ratio: 1/1) {
+            .globe-wrapper {
+                transform: translate(-50%, -30%);
+            }
         }
 
         #globe-popups-overlay {
@@ -39,8 +43,8 @@
 
         .overlay-img-container {
             position: absolute;
-            width: 75px;
-            height: 75px;
+            width: 65px;
+            height: 65px;
             display: flex;
             transform: translate(-50%, -50%);
         }
@@ -51,27 +55,16 @@
             transform-origin: center center;
         }
 
-        .lil-gui {
-            --width: 400px;
-            --widget-height: 20px;
-            font-size: 15px;
-            --input-font-size: 15px;
-            --padding: 10px;
-            --spacing: 10px;
-            --slider-knob-width: 5px;
-            --background-color: rgba(5, 0, 15, .8);
-            --widget-color: rgba(255, 255, 255, .3);
-            --focus-color: rgba(255, 255, 255, .4);
-            --hover-color: rgba(255, 255, 255, .5);
-            --font-family: monospace;
-            z-index: 1;
+        #dummy-list {
+            position: fixed;
+            top: 0;
+            right: 0;
+            font-family: sans-serif;
         }
     </style>
 </head>
 <body>
 
-<div class="page">
-</div>
 <div class="globe-container">
     <div class="globe-wrapper">
         <canvas id="globe-3d"></canvas>
@@ -79,8 +72,11 @@
         </div>
     </div>
 </div>
-<div class="page">
+
+<div id="dummy-list">
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
 
 <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
 <script type="importmap">
@@ -90,6 +86,7 @@
       "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.167.1/examples/jsm/"
     }
   }
+
 </script>
 
 
@@ -98,50 +95,157 @@
     import * as THREE from 'three';
     import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
     import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-    // import {GUI} from 'three/addons/libs/lil-gui.module.min.js';
 
     const containerEl = document.querySelector(".globe-container");
-    const wrapperEl = document.querySelector(".globe-wrapper");
     const canvas3D = containerEl.querySelector("#globe-3d");
     const popupsContainer = containerEl.querySelector("#globe-popups-overlay");
 
     let renderer, group, scene, camera, orbit, lightHolder, sea, wrapper;
 
-    const getSizes = () => {
-        return {
-            offsetLeftPercent: .4,
-            offsetBottomPx: .3 * window.innerHeight,
-            extraHeightPX: .2 * window.innerHeight,
-            sizePx: window.innerHeight,
-        }
-    }
+    let activeLocation = null;
+    let movingToSliderSelection = false;
 
-    const params = {
-        sizes: getSizes()
-    }
 
     const locations = [{
-        name: 'NY',
-        location: coordToPos(40, -74),
-        picURL: "https://api.dicebear.com/9.x/thumbs/svg?seed=Brian"
+        name: 'sanjose',
+        location: coordToPos(37, -128),
+        midScreenDist: 0,
+        picURL: "https://info.redbranchmedia.com/hubfs/spin-globe/Globe-Avatar-Gold.png"
+    }, {
+        name: 'santa-barbara',
+        location: coordToPos(34, -115),
+        midScreenDist: 0,
+        picURL: "https://info.redbranchmedia.com/hubfs/spin-globe/Globe-Avatar-Gold.png"
+    }, {
+        name: 'denver',
+        location: coordToPos(39, -104),
+        midScreenDist: 0,
+        picURL: "https://info.redbranchmedia.com/hubfs/spin-globe/Globe-Avatar-Rose.png"
+    }, {
+        name: 'kansas-city',
+        location: coordToPos(39, -94),
+        midScreenDist: 0,
+        picURL: "https://info.redbranchmedia.com/hubfs/spin-globe/Globe-Avatar-Lavender.png"
     }, {
         name: 'london',
-        location: coordToPos(51, 0),
-        picURL: "https://api.dicebear.com/9.x/thumbs/svg?seed=Mackenzie"
+        location: coordToPos(60, -5),
+        midScreenDist: 0,
+        picURL: "https://info.redbranchmedia.com/hubfs/spin-globe/Globe-Avatar-Agave.png"
     }, {
-        name: 'UAE',
-        location: coordToPos(23, 54),
-        picURL: "https://api.dicebear.com/9.x/thumbs/svg?seed=Sophia"
+        name: 'amsterdam',
+        location: coordToPos(55, 8),
+        midScreenDist: 0,
+        picURL: "https://info.redbranchmedia.com/hubfs/spin-globe/Globe-Avatar-Agave.png"
+    }, {
+        name: 'cologne',
+        location: coordToPos(50, 20),
+        midScreenDist: 0,
+        picURL: "https://info.redbranchmedia.com/hubfs/spin-globe/Globe-Avatar-Bloom-020.png"
     }, {
         name: 'india',
-        location: coordToPos(29, 77),
-        picURL: "https://api.dicebear.com/9.x/thumbs/svg?seed=Sarah"
+        location: coordToPos(19, 72),
+        midScreenDist: 0,
+        picURL: "https://info.redbranchmedia.com/hubfs/spin-globe/Globe-Avatar-Bloom-020.png"
+    }, {
+        name: 'singapore',
+        location: coordToPos(1, 103),
+        midScreenDist: 0,
+        picURL: "https://info.redbranchmedia.com/hubfs/spin-globe/Globe-Avatar-Rose.png"
+    }, {
+        name: 'manila',
+        location: coordToPos(14, 120),
+        midScreenDist: 0,
+        picURL: "https://info.redbranchmedia.com/hubfs/spin-globe/Globe-Avatar-Saffron.png"
+    }, {
+        name: 'tokyo',
+        location: coordToPos(35, 139),
+        midScreenDist: 0,
+        picURL: "https://info.redbranchmedia.com/hubfs/spin-globe/Globe-Avatar-Gold.png"
+    }, {
+        name: 'sydney',
+        location: coordToPos(-33, 150),
+        midScreenDist: 0,
+        picURL: "https://info.redbranchmedia.com/hubfs/spin-globe/Globe-Avatar-Saffron.png"
     }];
+
+
+    const fieldset = document.querySelector("#dummy-list");
+    locations.forEach(location => {
+        const label = document.createElement("label");
+        label.innerHTML = `
+                <input type="radio" name="location" value="${location.name}">
+                ${location.name}
+            `;
+        fieldset.appendChild(label);
+        fieldset.appendChild(document.createElement("br"));
+    });
+
+    document.querySelectorAll("input[name='location']").forEach(input => {
+        input.addEventListener("change", (event) => {
+            selectLocationFromSlider(event.target.value);
+        });
+    });
+
+    function updateActiveLocation(l) {
+        activeLocation = l;
+        document.querySelector('#dummy-list input[type="radio"][value="' + l.name + '"]').checked = true;
+    }
+
+    function selectLocationFromSlider(locationName) {
+        const location = locations.find(loc => loc.name === locationName);
+        if (!location) return;
+
+        const distance = camera.position.length();
+        const targetDirection = location.mesh.position.clone().normalize();
+
+        const offset = new THREE.Vector3(0, -0.45, 0);
+        const targetPosition = targetDirection.add(offset).normalize().multiplyScalar(distance);
+
+        const travelDistance = camera.position.distanceTo(targetPosition);
+        const duration = THREE.MathUtils.clamp(travelDistance / 3, .35, 2);
+
+        gsap.killTweensOf(camera.position);
+        gsap.to(camera.position, {
+            duration,
+            x: targetPosition.x,
+            y: targetPosition.y,
+            z: targetPosition.z,
+            onUpdate: () => {
+                const currentDirection = camera.position.clone().normalize();
+                camera.position.copy(currentDirection.multiplyScalar(distance));
+                camera.lookAt(new THREE.Vector3(0, 0, 0));
+                orbit.update();
+            },
+            onStart: () => {
+                movingToSliderSelection = true;
+            },
+            onComplete: () => {
+                movingToSliderSelection = false;
+            },
+        });
+
+        if (activeLocation) {
+            gsap.killTweensOf(activeLocation.popup);
+            gsap.to(activeLocation.popup, {
+                duration,
+                scale: 1,
+                zIndex: 0
+            });
+        }
+        gsap.to(location.popup, {
+            duration,
+            scale: 1.6,
+            zIndex: 10,
+            onComplete: () => {
+                updateActiveLocation(location);
+            }
+        });
+    }
+
 
     initScene();
     cretePointers();
     render();
-    // createControls();
     window.addEventListener("resize", updateSceneSize);
 
     function initScene() {
@@ -168,9 +272,8 @@
         const ambientLight = new THREE.AmbientLight(0xffffff, 2);
         scene.add(ambientLight);
 
-        const sideLight = new THREE.SpotLight(0xffffff, 2);
+        const sideLight = new THREE.SpotLight(0xffffff, 6);
         sideLight.position.set(1, -1, 2);
-        // sideLight.castShadow = true;
         const topLight = new THREE.SpotLight(0xffffff, 6);
         topLight.position.set(-1.3, 1.1, 2.3);
         topLight.castShadow = true;
@@ -197,17 +300,25 @@
         orbit.enableZoom = false;
         orbit.enablePan = false;
         orbit.enableDamping = true;
-        orbit.minPolarAngle = .37 * Math.PI;
-        orbit.maxPolarAngle = .37 * Math.PI;
-        orbit.autoRotate = true;
-        orbit.autoRotateSpeed *= .5;
+        orbit.minPolarAngle = .36 * Math.PI;
+        orbit.maxPolarAngle = .9 * Math.PI;
 
+        orbit.addEventListener('start', () => {
+            if (!movingToSliderSelection) {
+                selectFrontLocation();
+            }
+        });
+        orbit.addEventListener('change', () => {
+            if (!movingToSliderSelection) {
+                selectFrontLocation();
+            }
+        });
 
         const gltfLoader = new GLTFLoader();
         gltfLoader.load(
-            'no-materials.glb',
+            'globe-geometry.glb',
             (gltf) => {
-                const terra = gltf.scene.children[1];
+                const terra = gltf.scene.children[0];
                 terra.castShadow = true;
                 wrapper.add(terra);
 
@@ -215,16 +326,8 @@
                     metalness: .0,
                     roughness: .34,
                     ior: .78,
-                    specular: 0.9,
-                    // metalness: .8,
-                    // roughness: .7,
-                    // emissive: 0x448600,
                     reflectivity: .5,
-                    // ior: 2,
-                    // clearcoat: .3,
-                    // clearcoatRoughness: .7,
                     onBeforeCompile: (shader) => {
-
                         shader.vertexShader = shader.vertexShader.replace(
                             '#include <common>',
                             `#include <common>\n varying vec3 vPosition;`
@@ -240,11 +343,6 @@
                             `#include <common>\n varying vec3 vPosition;`
                         );
 
-                        // shader.fragmentShader = shader.fragmentShader.replace(
-                        //     'vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;',
-                        //     'vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;'
-                        // );
-
                         shader.fragmentShader = shader.fragmentShader.replace(
                             'vec4 diffuseColor = vec4( diffuse, opacity );',
                             `
@@ -253,13 +351,9 @@
 
                                 color = mix(color, color2, 1.2 * vPosition.y);
 
-                                // float dynamicRoughness = smoothstep(2.0, 5.0, length(vPosition));
-                                // roughness = mix(0.2, 1.0, dynamicRoughness);
-
                                 vec4 diffuseColor = vec4(.7 * color, opacity);
                             `
                         );
-
                     }
                 });
 
@@ -271,7 +365,6 @@
                     metalness: .2,
                     roughness: 0.6,
                     reflectivity: .7,
-                    // color: 0x10B0FE,
                     onBeforeCompile: (shader) => {
 
                         shader.vertexShader = shader.vertexShader.replace(
@@ -294,15 +387,11 @@
                             `
                                 vec3 color = vec3(.063, .69, .996);
                                 vec3 color2 = vec3(.0, .5, 1.);
-
                                 color = mix(color, color2, vNormal.z);
-
                                 vec4 diffuseColor = vec4(color, opacity);
                             `
                         );
-
                     }
-
                 })
 
             });
@@ -315,13 +404,11 @@
         });
 
         for (let lIdx = 0; lIdx < locations.length; lIdx++) {
-
             const pointer = new THREE.Mesh(pointerGeometry, pointerMaterial);
             pointer.position.set(locations[lIdx].location.x, locations[lIdx].location.y, locations[lIdx].location.z);
             pointer.name = lIdx;
             wrapper.add(pointer);
             locations[lIdx].mesh = pointer;
-
 
             locations[lIdx].popup = document.createElement("div");
             locations[lIdx].popup.classList.add("overlay-img-container");
@@ -332,15 +419,38 @@
             popupsContainer.appendChild(locations[lIdx].popup);
         }
 
-
     }
 
-    function render(time) {
+    function selectFrontLocation() {
+        const frontLocation = locations.reduce((prev, curr) => {
+            return (prev.midScreenDist < curr.midScreenDist) ? prev : curr;
+        });
+
+        if (activeLocation) {
+            if (frontLocation.name !== activeLocation.name) {
+                gsap.to(frontLocation.popup, {
+                    duration: .25,
+                    scale: 1.6,
+                    zIndex: 10
+                });
+                gsap.to(activeLocation.popup, {
+                    duration: .25,
+                    scale: 1,
+                    zIndex: 0
+                });
+                updateActiveLocation(frontLocation);
+            }
+        } else {
+            updateActiveLocation(frontLocation);
+        }
+    }
+
+    function render() {
 
         orbit.update();
         lightHolder.quaternion.copy(camera.quaternion);
 
-        locations.forEach((l, lIdx) => {
+        locations.forEach(l => {
             let activePointPosition = l.mesh.position.clone();
             const activePointPositionProjected = activePointPosition.clone();
             activePointPositionProjected.project(camera);
@@ -351,11 +461,16 @@
             const x = (activePointPositionProjected.x + 1) * popupsContainer.offsetWidth * .5;
             const y = (1 - activePointPositionProjected.y) * popupsContainer.offsetHeight * .5;
 
-            locations[lIdx].popup.style.left = x + "px";
-            locations[lIdx].popup.style.top = y + "px";
+            l.popup.style.left = x + "px";
+            l.popup.style.top = y + "px";
 
-            locations[lIdx].popup.style.opacity = THREE.MathUtils.clamp(30 * (activePointPosition.z + 2.5), 0, 1);
-            // locations[lIdx].popupImg.style.transform = "scale(" + THREE.MathUtils.clamp(20 * (activePointPosition.z + 2.7), .7, 1) + ")";
+            l.popup.style.opacity = THREE.MathUtils.clamp(12 * (activePointPosition.z + 2.5), 0, 1);
+
+            // l.midScreenDist = activePointPositionProjected.z;
+            l.midScreenDist = Math.abs(x - popupsContainer.offsetWidth * .5);
+            if (l.popup.style.opacity < .1) {
+                l.midScreenDist = 10000;
+            }
         });
 
 
@@ -364,20 +479,9 @@
     }
 
     function updateSceneSize() {
-        params.sizes = getSizes();
-
-        renderer.setSize(params.sizes.sizePx + params.sizes.extraHeightPX, params.sizes.sizePx + params.sizes.extraHeightPX);
-
-        wrapperEl.style.left = params.sizes.offsetLeftPercent * window.innerWidth + "px";
-        wrapperEl.style.bottom = -params.sizes.offsetBottomPx + "px";
+        const size = 1.37 * window.innerHeight;
+        renderer.setSize(size, size);
     }
-
-    function createControls() {
-        const gui = new GUI();
-        // gui
-        //     .add(params, "test", 0, 1000)
-    }
-
 
     function coordToPos(lat, lon) {
         const phi = (90 - lat) * (Math.PI / 180);
