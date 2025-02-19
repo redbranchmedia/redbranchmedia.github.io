@@ -197,11 +197,7 @@
 
         gsap.killTweensOf(camera.position);
         if (activeLocation) {
-            gsap.to(activeLocation.popup, {
-                duration,
-                scale: 1,
-                zIndex: 0
-            });
+            gsap.killTweensOf(activeLocation.popup);
         }
 
         const distance = camera.position.length();
