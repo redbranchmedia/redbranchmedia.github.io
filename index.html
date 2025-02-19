@@ -195,6 +195,15 @@
         const location = locations.find(loc => loc.name === locationName);
         if (!location) return;
 
+        gsap.killTweensOf(camera.position);
+        if (activeLocation) {
+            gsap.to(activeLocation.popup, {
+                duration,
+                scale: 1,
+                zIndex: 0
+            });
+        }
+
         const distance = camera.position.length();
         const targetDirection = location.mesh.position.clone().normalize();
 
@@ -204,7 +213,6 @@
         const travelDistance = camera.position.distanceTo(targetPosition);
         const duration = THREE.MathUtils.clamp(travelDistance / 3, .35, 2);
 
-        gsap.killTweensOf(camera.position);
         gsap.to(camera.position, {
             duration,
             x: targetPosition.x,
@@ -225,7 +233,6 @@
         });
 
         if (activeLocation) {
-            gsap.killTweensOf(activeLocation.popup);
             gsap.to(activeLocation.popup, {
                 duration,
                 scale: 1,
