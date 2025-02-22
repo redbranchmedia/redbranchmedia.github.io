@@ -323,12 +323,6 @@
         document.querySelector(".prev").addEventListener("click", () => {
             sliderLoop.previous({duration: 0.65, ease: "power1.inOut"})
         });
-
-        locations.forEach((l, i) => {
-            l.popup.onclick = function () {
-                sliderLoop.toIndex((i - 1), {duration: 0.8, ease: "power1.inOut"});
-            }
-        })
     }
 
     function selectLocationFromSlider(location, delay = 0) {
@@ -539,6 +533,12 @@
             locations[lIdx].popup.appendChild(locations[lIdx].popupWrapper);
             popupsContainer.appendChild(locations[lIdx].popup);
         }
+
+        locations.forEach((l, i) => {
+            l.popup.onclick = function () {
+                sliderLoop.toIndex((i - 1), {duration: 0.5, ease: "power1.inOut"});
+            }
+        })
     }
 
     function render() {
@@ -565,6 +565,7 @@
             if (l.popup.style.opacity < .1) {
                 l.midScreenDist = 10000;
             }
+            l.popup.style.display = l.popup.style.opacity < .15 ? "none": "block";
         });
 
 
@@ -766,27 +767,6 @@
                     onThrowComplete: () => {
                         syncIndex();
                         wasPlaying && tl.play();
-
-                        const targetElement = sliderItems[tl.current() + 1];
-                        const activeLocationIndex = targetElement.getAttribute("data-location-idx");
-                        // selectLocationFromSlider(locations[activeLocationIndex]);
-
-
-                        // locations.forEach((l, lIdx) => {
-                        //      console.log(activeLocationIndex)
-                        //     gsap.to(l.popup, {
-                        //         duration: .0001,
-                        //         // scale: 3,
-                        //         scale: lIdx === activeLocationIndex ? 10 : 1,
-                        //         // zIndex: lIdx === activeLocationIndex ? 10 : 0,
-                        // //     });
-                        //     gsap.to(locations[activeLocationIndex].popup, {
-                        //         duration: .3,
-                        //         // scale: 3,
-                        //         scale: 1.5,
-                        //         // zIndex: lIdx === activeLocationIndex ? 10 : 0,
-                        //     });
-                        // // })
                     }
                 })[0];
                 tl.draggable = draggable;
