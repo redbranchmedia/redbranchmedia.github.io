@@ -51,6 +51,8 @@
             height: 65px;
             display: flex;
             transform: translate(-50%, -50%);
+            pointer-events: auto;
+            cursor: pointer;
         }
 
         .overlay-img-container .overlay-img-wrapper {
@@ -180,9 +182,8 @@
 
     let renderer, scene, camera, orbit, lightHolder, sea, wrapper;
 
-    let frontLocation, oldFrontLocation;
+    let sliderItems;
     let movingToSliderSelection = false;
-
     let sliderActiveElement, sliderLoop;
 
 
@@ -260,23 +261,29 @@
         sliderPicURL: "./city-placeholder.png"
     }];
 
+    initScene();
+    cretePointers();
+    render();
+    window.addEventListener("resize", updateSceneSize);
 
-    locations.forEach((location, idx) => {
-        const sliderItem = document.createElement('div');
-        sliderItem.classList.add('slider-item');
-        sliderItem.setAttribute("data-location-idx", idx);
-        sliderItem.innerHTML = `
+
+    function createSliderItems() {
+        locations.forEach((location, idx) => {
+            const sliderItem = document.createElement('div');
+            sliderItem.classList.add('slider-item');
+            sliderItem.setAttribute("data-location-idx", idx);
+            sliderItem.innerHTML = `
         <div class="slider-image-wrapper">
             <img src="${location.sliderPicURL}" alt="${location.name}" />
             <div class="slider-location-name">${location.name}</div>
         </div>
         `;
-        sliderWrapperEL.appendChild(sliderItem);
-    });
-    const sliderItems = gsap.utils.toArray(".slider-item");
+            sliderWrapperEL.appendChild(sliderItem);
+        });
+        return gsap.utils.toArray(".slider-item");
+    }
 
-
-    function setupCarousel() {
+    function setupSlider() {
         sliderLoop = horizontalLoop(sliderItems, {
             paused: true,
             draggable: true,
@@ -307,6 +314,7 @@
         sliderItems.forEach((item, i) => item.addEventListener("click", () => {
             sliderItems[i].classList.add("active");
             sliderLoop.toIndex((i - 1), {duration: 0.8, ease: "power1.inOut"});
+            selectLocationFromSlider(locations[i - 1], 0);
         }));
 
         document.querySelector(".next").addEventListener("click", () => {
@@ -316,9 +324,15 @@
             sliderLoop.previous({duration: 0.65, ease: "power1.inOut"})
         });
 
+        locations.forEach((l, i) => {
+            l.popup.onclick = function () {
+                sliderLoop.toIndex((i - 1), {duration: 0.8, ease: "power1.inOut"});
+            }
+        })
     }
 
     function selectLocationFromSlider(location, delay = 0) {
+        if (!location) return;
 
         gsap.killTweensOf(camera.position);
 
@@ -352,12 +366,6 @@
             },
         });
     }
-
-
-    initScene();
-    cretePointers();
-    render();
-    window.addEventListener("resize", updateSceneSize);
 
     function initScene() {
         renderer = new THREE.WebGLRenderer({
@@ -501,7 +509,9 @@
                         );
                     }
                 })
-                setupCarousel();
+                
+                sliderItems = createSliderItems();
+                setupSlider();
             });
     }
 
@@ -532,7 +542,6 @@
     }
 
     function render() {
-
         orbit.update();
         lightHolder.quaternion.copy(camera.quaternion);
 
